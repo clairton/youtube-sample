@@ -14,6 +14,7 @@ package br.com.obviobrasil;
  */
 
 import java.io.File;
+import java.io.InputStreamReader;
 import java.util.List;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -51,16 +52,16 @@ public class ChannelList {
 	 *
 	 * @param scopes list of scopes needed to run upload.
 	 */
-	private static String getToken(List<String> scopes) throws Exception {
-		GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY,
-				ChannelList.class.getResourceAsStream("/client_secrets.json"));
+	private static Credential getCredential(List<String> scopes) throws Exception {
+		GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(ChannelList.class.getResourceAsStream("/client_secrets.json")));
 		final String home = System.getProperty("user.home");
 		final File store = new File(home, ".credentials/channel-list.json");
 		FileCredentialStore credentialStore = new FileCredentialStore(store, JSON_FACTORY);
 		GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(HTTP_TRANSPORT, JSON_FACTORY,
-				clientSecrets, scopes).setCredentialStore(credentialStore).build();
+				clientSecrets, scopes).setAccessType("offline").setCredentialStore(credentialStore).build();
 		LocalServerReceiver localReceiver = new LocalServerReceiver.Builder().setPort(8080).build();
-		return new AuthorizationCodeInstalledApp(flow, localReceiver).authorize("user").getAccessToken();
+		Credential credential = new AuthorizationCodeInstalledApp(flow, localReceiver).authorize("user");
+		return credential;
 	}
 
 	/**
@@ -69,15 +70,14 @@ public class ChannelList {
 	 * video ID to that channel.
 	 */
 	public static void main(String[] args) {
-		List<String> scopes = Lists.newArrayList("https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/youtube");
+		List<String> scopes = Lists.newArrayList("https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email");
 		try {
-			final String token = getToken(scopes);
-			System.err.println(token);
-			final Credential credential = new GoogleCredential().setAccessToken(token);
+			final Credential credential = getCredential(scopes);
+//			final String token = "ya29.GltdB9iWKe5kCDdfSSOHyMBU5vn3IqHfuHepJyrL4cpilV8mMvnlZ4gUKQ-_MPlCsASKIGH3P9xVIbJaDCcEmJp24JdLETjFtGeSJpNnOI2YFt_aUnLvPWHh-FUu";
 			YouTube youtube = new YouTube.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential).setApplicationName("Hugme")
 					.build();
 			YouTube.Channels.List channelRequest = youtube.channels().list("id,snippet,contentDetails");
-			channelRequest.setMine("true");
+			channelRequest.setMine(true);
 			ChannelListResponse channelResult = channelRequest.execute();
 			List<Channel> channelsList = channelResult.getItems();
 			if (channelsList != null) {
